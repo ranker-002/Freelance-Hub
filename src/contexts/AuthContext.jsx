@@ -20,23 +20,24 @@ export function AuthProvider({ children }) {
 
   const fetchUserProfile = async (userId) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/profiles/${userId}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${user?.token}` },
-      });
-  
-      if (!response.ok) {
-        throw new Error('Erreur lors du chargement du profil');
-      }
-  
-      const profile = await response.json();
-      setUserProfile(profile);
+        const response = await fetch(`http://localhost:5000/api/profiles/${userId}`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${user?.token}` },
+        });
+
+        if (!response.ok) {
+            throw new Error('Erreur lors du chargement du profil');
+        }
+
+        const profile = await response.json();
+        setUserProfile(profile);
     } catch (error) {
-      console.error('Erreur lors du chargement du profil:', error);
+        console.error('Erreur lors du chargement du profil:', error);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
+
 
   const signUp = async (data) => {
     try {

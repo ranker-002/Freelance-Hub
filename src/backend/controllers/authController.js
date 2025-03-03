@@ -7,9 +7,19 @@ const register = async (req, res) => {
   const { email, password, userType, name, skills, hourlyRate } = req.body;
 
   try {
+      // Vérifier si l'utilisateur existe déjà
+      const [existingUsers] = await pool.query("SELECT id FROM users WHERE email = ?", [email]);
+      if (existingUsers.length > 0) {
+          return res.status(400).json({ message: "L'email est déjà utilisé." });
+      }
+
+      // Hasher le mot de passe
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Insérer l'utilisateur
       const [userResult] = await pool.query(
           "INSERT INTO users (email, password, user_type) VALUES (?, ?, ?)",
-          [email, password, userType]
+          [email, hashedPassword, userType]
       );
 
       const userId = userResult.insertId; // Récupération de l'ID inséré
@@ -26,22 +36,18 @@ const register = async (req, res) => {
 
       await pool.query(profileQuery, profileValues);
 
-      res.status(201).json({ userId });
+      res.status(201).json({ userId, message: "Inscription réussie." });
   } catch (error) {
       console.error("Erreur d'inscription :", error);
       res.status(500).json({ message: "Erreur lors de l'inscription" });
   }
 };
 
-
 const login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const connection = await pool.getConnection();
-    const [users] = await connection.query('SELECT * FROM users WHERE email = ?', [email]);
-    connection.release();
-
+    const [users] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
     if (users.length === 0) {
       return res.status(401).json({ message: 'Identifiants incorrects' });
     }
@@ -56,7 +62,7 @@ const login = async (req, res) => {
     const token = jwt.sign({ userId: user.id, userType: user.user_type }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.json({ token, userId: user.id, userType: user.user_type });
   } catch (error) {
-    console.error(error);
+    console.error("Erreur lors de la connexion :", error);
     res.status(500).json({ message: 'Erreur serveur' });
   }
 };

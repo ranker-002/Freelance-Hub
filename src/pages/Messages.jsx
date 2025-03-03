@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
 import { Send } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
 
 const Messages = () => {
   const { user } = useAuth();
@@ -15,15 +15,18 @@ const Messages = () => {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    fetchConversations();
-    const subscription = supabase
-      .channel('messages')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, handleNewMessage)
-      .subscribe();
+    if (!user) return;
 
-    return () => {
-      subscription.unsubscribe();
+    const fetchConversations = async () => {
+      try {
+        const { data } = await axios.get(`/api/conversations/${user.id}`);
+        setConversations(data);
+      } catch (error) {
+        console.error('Erreur lors du chargement des conversations:', error);
+      }
     };
+
+    fetchConversations();
   }, [user]);
 
   useEffect(() => {
@@ -40,65 +43,14 @@ const Messages = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const fetchConversations = async () => {
-    try {
-      const { data: sentMessages } = await supabase
-        .from('messages')
-        .select('receiver_id')
-        .eq('sender_id', user.id)
-        .distinct();
-
-      const { data: receivedMessages } = await supabase
-        .from('messages')
-        .select('sender_id')
-        .eq('receiver_id', user.id)
-        .distinct();
-
-      const userIds = new Set([
-        ...sentMessages.map(m => m.receiver_id),
-        ...receivedMessages.map(m => m.sender_id)
-      ]);
-
-      const { data: users } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', Array.from(userIds));
-
-      setConversations(users);
-    } catch (error) {
-      console.error('Erreur lors du chargement des conversations:', error);
-    }
-  };
-
   const fetchMessages = async (userId) => {
     try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select(`
-          *,
-          sender:profiles!messages_sender_id_fkey(name),
-          receiver:profiles!messages_receiver_id_fkey(name)
-        `)
-        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${userId}),and(sender_id.eq.${userId},receiver_id.eq.${user.id})`)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
+      const { data } = await axios.get(`/api/messages/${user.id}/${userId}`);
       setMessages(data);
 
-      // Marquer les messages comme lus
-      await supabase
-        .from('messages')
-        .update({ read: true })
-        .eq('receiver_id', user.id)
-        .eq('sender_id', userId);
+      await axios.put(`/api/messages/read`, { senderId: userId, receiverId: user.id });
     } catch (error) {
       console.error('Erreur lors du chargement des messages:', error);
-    }
-  };
-
-  const handleNewMessage = (payload) => {
-    if (payload.new && (payload.new.sender_id === selectedUser?.id || payload.new.receiver_id === selectedUser?.id)) {
-      fetchMessages(selectedUser.id);
     }
   };
 
@@ -107,18 +59,13 @@ const Messages = () => {
     if (!newMessage.trim() || !selectedUser) return;
 
     try {
-      const { error } = await supabase
-        .from('messages')
-        .insert([
-          {
-            sender_id: user.id,
-            receiver_id: selectedUser.id,
-            content: newMessage.trim(),
-          }
-        ]);
-
-      if (error) throw error;
+      await axios.post(`/api/messages/send`, {
+        senderId: user.id,
+        receiverId: selectedUser.id,
+        content: newMessage.trim(),
+      });
       setNewMessage('');
+      fetchMessages(selectedUser.id);
     } catch (error) {
       console.error('Erreur lors de l\'envoi du message:', error);
     }
@@ -128,7 +75,6 @@ const Messages = () => {
     <div className="min-h-screen pt-20 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          {/* Liste des conversations */}
           <div className="bg-glass-primary rounded-xl border border-white/10 p-4">
             <h2 className="text-xl font-bold text-white mb-4">Conversations</h2>
             <div className="space-y-2">
@@ -145,43 +91,28 @@ const Messages = () => {
                   }`}
                 >
                   <p className="font-medium text-white">{conv.name}</p>
-                  <p className="text-sm text-gray-400">{conv.user_type}</p>
                 </motion.button>
               ))}
             </div>
           </div>
 
-          {/* Zone de messages */}
           <div className="md:col-span-3 bg-glass-primary rounded-xl border border-white/10 p-4 flex flex-col h-[calc(100vh-8rem)]">
             {selectedUser ? (
               <>
                 <div className="border-b border-white/10 pb-4 mb-4">
-                  <h2 className="text-xl font-bold text-white">
-                    {selectedUser.name}
-                  </h2>
+                  <h2 className="text-xl font-bold text-white">{selectedUser.name}</h2>
                 </div>
 
                 <div className="flex-1 overflow-y-auto space-y-4 mb-4">
                   {messages.map((message) => (
                     <div
                       key={message.id}
-                      className={`flex ${
-                        message.sender_id === user.id ? 'justify-end' : 'justify-start'
-                      }`}
+                      className={`flex ${message.senderId === user.id ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div
-                        className={`max-w-[70%] p-3 rounded-lg ${
-                          message.sender_id === user.id
-                            ? 'bg-primary-500/20 text-white'
-                            : 'bg-white/5 text-gray-200'
-                        }`}
-                      >
+                      <div className={`max-w-[70%] p-3 rounded-lg ${message.senderId === user.id ? 'bg-primary-500/20 text-white' : 'bg-white/5 text-gray-200'}`}>
                         <p>{message.content}</p>
                         <p className="text-xs text-gray-400 mt-1">
-                          {formatDistanceToNow(new Date(message.created_at), {
-                            addSuffix: true,
-                            locale: fr,
-                          })}
+                          {formatDistanceToNow(new Date(message.createdAt), { addSuffix: true, locale: fr })}
                         </p>
                       </div>
                     </div>

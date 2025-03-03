@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { ArrowRight, Code, Briefcase, Users } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import Scene from '../components/3d/Scene';
+import Scene from '../components/3d/Scene'; // Assure-toi que ce fichier existe
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -63,7 +63,7 @@ const LandingPage = () => {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
-                  className="px-8 py-3 bg-glass-primary hover:bg-glass-secondary text-white rounded-lg font-medium border border-white/10 backdrop-blur-sm"
+                  className="px-8 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium border border-white/10 backdrop-blur-sm"
                 >
                   En savoir plus
                 </motion.button>
@@ -107,16 +107,10 @@ const FeatureCard = ({ icon, title, description, delay }) => (
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay, duration: 0.8 }}
-    whileHover={{ y: -5, scale: 1.02 }}
-    className="p-6 rounded-xl backdrop-blur-xl bg-glass-primary border border-white/10 hover:border-primary-500/50 transition-all duration-300"
+    whileHover={{ y: -5, scale: 1.05 }}
+    className="p-6 rounded-xl backdrop-blur-xl bg-white/10 border border-white/10 hover:border-primary-500/50 transition-all duration-300"
   >
-    <motion.div 
-      className="mb-4"
-      whileHover={{ rotate: 360 }}
-      transition={{ duration: 0.8 }}
-    >
-      {icon}
-    </motion.div>
+    <div className="mb-4">{icon}</div>
     <h3 className="text-xl font-semibold text-white mb-2">{title}</h3>
     <p className="text-gray-300">{description}</p>
   </motion.div>

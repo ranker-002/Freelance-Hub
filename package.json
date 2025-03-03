@@ -16,6 +16,7 @@
     "@react-three/fiber": "^8.15.16",
     "@stripe/stripe-js": "^3.0.7",
     "@supabase/supabase-js": "^2.39.7",
+    "axios": "^1.8.1",
     "bcrypt": "^5.1.1",
     "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.0",
